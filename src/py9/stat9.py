@@ -1,8 +1,8 @@
 import struct
 
-from qid import Qid
+from .qid import Qid
 
-from utils import (
+from .utils import (
     encode_string,
     STR_LEN,
 )

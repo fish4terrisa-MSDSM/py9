@@ -21,3 +21,4 @@ class Errors(StrEnum):
     Eunknownfid = 'unknown fid'
     Ebaddir = 'bad directory in wstat'
     Ewalknodir = 'walk in non-directory'
+    Enoauth = 'authentication not required'

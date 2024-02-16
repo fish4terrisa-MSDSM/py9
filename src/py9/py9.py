@@ -4,11 +4,11 @@ import selectors
 import socket
 import struct
 
-from trs import TRs
-from qid import Qid
-from stat9 import Stat
+from .trs import TRs
+from .qid import Qid
+from .stat9 import Stat
 
-from utils import (
+from .utils import (
     encode_string,
     STR_LEN,
 )
@@ -418,14 +418,14 @@ class Py9:
 
         buff += aqid.to_bytes()
 
-        return self._encode_packet(TRs.Rauth, tag)
+        return self._encode_packet(TRs.Rauth, buff, tag)
 
     def _encode_Rerror(self, ename: str, tag: int) -> bytes:
         buff: bytes = b''
 
         buff += encode_string(ename)
 
-        return self._encode_packet(TRs.Rerror, tag)
+        return self._encode_packet(TRs.Rerror, buff, tag)
 
     def _encode_Tflush(
             self,

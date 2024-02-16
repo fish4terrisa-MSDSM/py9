@@ -1,5 +1,5 @@
-from py9 import Py9
-from trs import TRs
+from .py9 import Py9
+from .trs import TRs
 
 import socket
 import selectors
@@ -7,6 +7,9 @@ import struct
 
 
 class Py9Server(Py9):
+    class ClientDisconnected(Exception):
+        pass
+
     class Client(Py9):
         def __init__(
                 self,
@@ -25,13 +28,19 @@ class Py9Server(Py9):
 
         def receive(self):
             if len(self.buffer) < 4:
-                self.buffer += self.socket.recv(4 - len(self.buffer))
+                rec = self.socket.recv(4 - len(self.buffer))
+                if not rec:
+                    raise Py9Server.ClientDisconnected
+                self.buffer += rec
             if len(self.buffer) < 4:
                 return None
 
             size = struct.unpack('<I', self.buffer[0:4])[0]
             if len(self.buffer) < size:
-                self.buffer += self.socket.recv(size - len(self.buffer))
+                rec = self.socket.recv(size - len(self.buffer))
+                if not rec:
+                    raise Py9Server.ClientDisconnected
+                self.buffer += rec
             if len(self.buffer) < size:
                 return None
 
@@ -75,6 +84,10 @@ class Py9Server(Py9):
         self.selector.register(sock, selectors.EVENT_READ)
         return new_client
 
+    def __disconnect(self, fd) -> None:
+        self.selector.unregister(self.clients[fd].socket)
+        del self.clients[fd]
+
     def serve(self):
         ret: list[dict] = []
         events = self.selector.select()
@@ -84,13 +97,17 @@ class Py9Server(Py9):
                 self.__accept()
             else:
                 client: Py9Server.Client = self.clients[key.fd]
-                data = client.receive()
-                if data:
-                    ret.append({
-                        'client_id': key.fd,
-                        'data': data,
-                        'operation': data['operation'],
-                    })
+                try:
+                    data = client.receive()
+                except Py9Server.ClientDisconnected:
+                    self.__disconnect(key.fd)
+                else:
+                    if data:
+                        ret.append({
+                            'client_id': key.fd,
+                            'data': data,
+                            'operation': data['operation'],
+                        })
 
         for packet in ret:
             match packet['operation']:
@@ -100,25 +117,25 @@ class Py9Server(Py9):
                     self.handle_Tauth(packet)
                 case TRs.Tattach:
                     self.handle_Tattach(packet)
-                case TRs.Tflush(packet):
+                case TRs.Tflush:
                     self.handle_Tflush(packet)
-                case TRs.Twalk(packet):
+                case TRs.Twalk:
                     self.handle_Twalk(packet)
-                case TRs.Topen(packet):
+                case TRs.Topen:
                     self.handle_Topen(packet)
-                case TRs.Tcreate(packet):
+                case TRs.Tcreate:
                     self.handle_Tcreate(packet)
-                case TRs.Tread(packet):
+                case TRs.Tread:
                     self.handle_Tread(packet)
-                case TRs.Twrite(packet):
+                case TRs.Twrite:
                     self.handle_Twrite(packet)
-                case TRs.Tclunk(packet):
+                case TRs.Tclunk:
                     self.handle_Tclunk(packet)
-                case TRs.Tremove(packet):
+                case TRs.Tremove:
                     self.handle_Tremove(packet)
-                case TRs.Tstat(packet):
+                case TRs.Tstat:
                     self.handle_Tstat(packet)
-                case TRs.Twstat(packet):
+                case TRs.Twstat:
                     self.handle_Twstat(packet)
         return ret
 
@@ -170,4 +187,7 @@ class Py9Server(Py9):
             self.selector.unregister(self.clients[id].socket)
             del self.clients[id]
 
-        super().__del__()
+        self.selector.unregister(self.socket)
+        self.socket.shutdown(socket.SHUT_RDWR)
+        self.socket.recv(0)
+        self.socket.close()
