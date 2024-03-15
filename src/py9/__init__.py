@@ -5,3 +5,6 @@ from .errors import Errors
 from .stat9 import Stat
 from .qid import Qid
 from .trs import TRs
+from .fid import Fid
+from .types import Types
+from .modes import Modes

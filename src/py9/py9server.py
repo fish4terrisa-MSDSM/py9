@@ -1,5 +1,7 @@
 from .py9 import Py9
 from .trs import TRs
+from .fid import Fid
+from .qid import Qid
 
 import socket
 import selectors
@@ -24,6 +26,10 @@ class Py9Server(Py9):
             self._version: str = version
             self.buffer: bytes = b''
 
+            self.qids: dict[int, Qid] = {}
+            self.fids: dict[int, Fid] = {}
+
+            self.fid: int = -1
             self.tag: int = -1
 
         def receive(self):

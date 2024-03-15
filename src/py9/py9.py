@@ -7,6 +7,7 @@ import struct
 from .trs import TRs
 from .qid import Qid
 from .stat9 import Stat
+from .fid import Fid
 
 from .utils import (
     encode_string,
@@ -35,13 +36,23 @@ class Py9:
             socket.AF_INET,
             socket.SOCK_STREAM,
         )
+        self.qids: dict[int, Qid] = {}
+        self.fids: dict[int, Fid] = {}
         self.selector.register(self.socket, selectors.EVENT_READ)
 
+        self.fid: int = -1
         self.tag: int = -1
+
+    def get_fid(self):
+        self.fid += 1
+        if self.fid > 256 ** 4 - 1:
+            self.fid = 0
+
+        return self.fid
 
     def get_tag(self):
         self.tag += 1
-        if self.tag > 65535:
+        if self.tag > 256 ** 2 - 1:
             self.tag = 0
 
         return self.tag
@@ -212,7 +223,6 @@ class Py9:
                 ret = {
                     'fid': fid,
                     'newfid': newfid,
-                    'nwname': nwname,
                     'wnames': wnames,
                 }
 
@@ -496,7 +506,7 @@ class Py9:
     ) -> bytes:
         buff: bytes = b''
 
-        buff += struct.pack('<I', len(nwqids))
+        buff += struct.pack('<H', len(nwqids))
 
         for nwqid in nwqids:
             buff += nwqid.to_bytes()
@@ -662,12 +672,12 @@ class Py9:
     ) -> bytes:
         buff: bytes = b''
 
-        buff += struct.pack('<H', len(stats))
-
         for stat in stats:
             buff += stat.to_bytes()
 
-        return self._encode_packet(TRs.Rstat, buff, tag)
+        size = struct.pack('<H', len(buff))
+
+        return self._encode_packet(TRs.Rstat, size + buff, tag)
 
     def _encode_Twstat(
             self,

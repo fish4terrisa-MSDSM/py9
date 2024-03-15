@@ -1,6 +1,7 @@
 from .py9 import Py9
 from .trs import TRs
 from .stat9 import Stat
+from .fid import Fid
 
 import socket
 

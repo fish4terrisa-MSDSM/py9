@@ -11,10 +11,9 @@ from .utils import (
 class Stat:
     def __init__(
             self,
-            size: int,
             _type: int,
             dev: int,
-            qid: int,
+            qid: Qid,
             mode: int,
             atime: int,
             mtime: int,
@@ -24,7 +23,6 @@ class Stat:
             gid: str,
             muid: str,
     ):
-        self.size: int = size
         self._type: int = _type
         self.dev: int = dev
         self.qid: Qid = qid
@@ -40,7 +38,6 @@ class Stat:
     @classmethod
     def from_bytes(cls, stat: bytes):
         try:
-            size: int = struct.unpack('<H', stat[0:2])[0]
             _type: int = struct.unpack('<H', stat[2:4])[0]
             dev: int = struct.unpack('<I', stat[4:8])[0]
             qid: bytes = Qid.from_bytes(stat[8:21])
@@ -77,7 +74,6 @@ class Stat:
                 "Is provided data a valid stat?")
 
         return cls(
-            size,
             _type,
             dev,
             qid,
