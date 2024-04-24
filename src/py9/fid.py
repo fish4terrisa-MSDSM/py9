@@ -11,3 +11,5 @@ class Fid:
         self.fid = fid
         self.path: str = path
         self.qid: Qid = qid
+
+        self.fs_fid = None

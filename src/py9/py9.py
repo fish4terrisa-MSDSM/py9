@@ -16,7 +16,7 @@ from .utils import (
 
 
 class Py9:
-    # http://man.cat-v.org/plan_9/5
+    # http://man.cat-v.org/plan_9/5/
     # http://9p.cat-v.org/documentation/rfc/
     # http://man.9front.org/5/
 
@@ -388,7 +388,7 @@ class Py9:
     ) -> bytes:
         size: bytes = struct.pack('<I', len(data) + 7)
         t: bytes = struct.pack('<B', _type.value)
-        if not tag:
+        if tag is None:
             tag = self.get_tag()
 
         if isinstance(tag, int):

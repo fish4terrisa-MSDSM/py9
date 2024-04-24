@@ -13,34 +13,6 @@ import sys
 import os
 
 
-class FileFid(Fid):
-    def __init__(
-            self,
-            fid: int,
-            path: str = '',
-            qid: Qid = None,
-    ) -> None:
-        super().__init__(fid, path, qid)
-        self.fs_fid = None
-
-    def open_file(self, root: str):
-        self.fs_fid = open(root + '/' + self.path, 'rb')
-
-    def close_file(self):
-        if self.fs_fid:
-            self.fs_fid.close()
-
-    def read_file(self, offset: int, count: int) -> bytes:
-        if not self.fs_fid:
-            raise Exception("No file opened")
-
-        self.fs_fid.seek(offset)
-        return self.fs_fid.read(count)
-
-    def __del__(self):
-        self.close_file()
-
-
 class FileStat(Stat):
     @classmethod
     def from_path(
@@ -93,10 +65,42 @@ class FileServer(Py9Server):
         self.path_num = -1
         self.paths: dict[str, int] = {}
 
+    def open_file(self, fid: Fid):
+        f_path = self.directory + '/' + fid.path
+        if not os.path.isdir(f_path):
+            fid.fs_fid = open(self.directory + '/' + fid.path, 'rb')
+        else:
+            fid.fs_fid = self.directory + '/' + fid.path
+
+    def close_file(self, fid: Fid):
+        if fid.fs_fid:
+            if not isinstance(fid.fs_fid, str):
+                fid.fs_fid.close()
+
+    def read_file(self, fid: Fid, offset: int, count: int) -> bytes:
+        if not fid.fs_fid:
+            raise Exception("No file opened")
+
+        if isinstance(fid.fs_fid, str):
+            ret = b''
+            fss = []
+            for dir in os.listdir(fid.fs_fid):
+                path = fid.fs_fid + '/' + dir
+                qid: Qid = self.get_qid(path)
+                fss.append(FileStat.from_path(path, qid))
+
+            for fs in fss:
+                ret += fs.to_bytes()
+            return ret[offset:offset+count]
+
+        else:
+            fid.fs_fid.seek(offset)
+            return fid.fs_fid.read(count)
+
     def check_file_type(self, path: str) -> Types:
-        if os.path.isdir(self.directory + path):
+        if os.path.isdir(self.directory + '/' + path):
             return Types.QTDIR
-        if os.path.isfile(self.directory + path):
+        if os.path.isfile(self.directory + '/' + path):
             return Types.QTFILE
         return None
 
@@ -112,8 +116,6 @@ class FileServer(Py9Server):
             return self.qids[self.paths[path]]
         path_num = self.get_path_num()
         file_type = self.check_file_type(path)
-        if not file_type:
-            return None
         qid = Qid(
             _type=file_type,
             version=0,
@@ -148,7 +150,7 @@ class FileServer(Py9Server):
             return
 
         qid = self.get_qid('/')
-        client.fids[fid] = FileFid(
+        client.fids[fid] = Fid(
             fid=fid,
             path='/',
             qid=qid,
@@ -193,20 +195,34 @@ class FileServer(Py9Server):
             return
 
         fid = client.fids[data['fid']]
-        nfid = FileFid(
+        nfid = Fid(
             fid=data['newfid'],
             path=fid.path,
         )
 
-        first_loop = True
+        walk_nodir = True
         failed = False
         new_path = fid.path
         qids: [Qid] = []
 
-        for p in data['wnames']:
+        if not data['wnames']:
+            nfid.path = fid.path
+            nfid.qid = self.get_qid(fid.path)
+            client.fids[data['newfid']] = nfid
+
+            client.socket.sendall(
+                client._encode_Rwalk(
+                    qids,
+                    data['tag'],
+                )
+            )
+            return
+
+        for p in map(lambda x: x.decode(), data['wnames']):
             if not os.path.isdir(new_path):
                 failed = True
                 break
+            walk_nodir = False
             if p == '..':
                 if new_path != '/':
                     new_path = new_path.split('/')[0:-1].join('/')
@@ -214,11 +230,11 @@ class FileServer(Py9Server):
                 if os.path.exists(self.directory + '/' + new_path + '/' + p):
                     new_path = new_path + '/' + p
                 else:
+                    failed = True
                     break
-            first_loop = False
             qids.append(self.get_qid(new_path))
 
-        if failed and first_loop:
+        if failed and walk_nodir:
             client.socket.sendall(
                 client._encode_Rerror(
                     Errors.Ewalknodir,
@@ -227,9 +243,10 @@ class FileServer(Py9Server):
             )
             return
 
-        nfid.path = new_path
-        nfid.qid = self.get_qid(new_path)
-        client.fids[data['newfid']] = nfid
+        if not failed:
+            nfid.path = new_path
+            nfid.qid = self.get_qid(new_path)
+            client.fids[data['newfid']] = nfid
 
         client.socket.sendall(
             client._encode_Rwalk(
@@ -263,9 +280,9 @@ class FileServer(Py9Server):
             )
             return
 
-        fid_c: FileFid = client.fids[fid]
+        fid_c: Fid = client.fids[fid]
         qid = fid_c.qid
-        fid_c.open_file(self.directory)
+        self.open_file(fid_c)
 
         client.socket.sendall(
             client._encode_Ropen(
@@ -293,8 +310,8 @@ class FileServer(Py9Server):
         offset = data['offset']
         count = data['count']
 
-        fid_c: FileFid = client.fids[fid]
-        readed = fid_c.read_file(offset, count)
+        fid_c: Fid = client.fids[fid]
+        readed = self.read_file(fid_c, offset, count)
 
         client.socket.sendall(
             client._encode_Rread(
@@ -314,7 +331,19 @@ class FileServer(Py9Server):
         )
 
     def handle_Tclunk(self, d: dict):
-        raise NotImplementedError
+        client: Py9Server.Client = self.clients[d['client_id']]
+        data: dict = d['data']
+
+        fid = data['fid']
+        fid_c: Fid = client.fids[fid]
+        self.close_file(fid_c)
+        del client.fids[fid]
+
+        client.socket.sendall(
+            client._encode_Rclunk(
+                data['tag'],
+            )
+        )
 
     def handle_Tremove(self, d: dict):
         client: Py9Server.Client = self.clients[d['client_id']]
@@ -354,19 +383,14 @@ class FileServer(Py9Server):
 
 
 if __name__ == '__main__':
-    try:
-        fs = FileServer(
-            ip=sys.argv[1],
-            port=int(sys.argv[2]),
-            directory=sys.argv[3],
-        )
-    except Exception:
-        raise
-    else:
-        while True:
-            try:
-                print(fs.serve())
-            except Exception:
-                del fs
-                raise
-                break
+    fs = FileServer(
+        ip=sys.argv[1],
+        port=int(sys.argv[2]),
+        directory=sys.argv[3],
+    )
+    while True:
+        try:
+            print(fs.serve())
+        except Exception:
+            del fs
+            break
