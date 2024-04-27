@@ -1,15 +1,20 @@
-from enum import IntEnum
+from enum import IntFlag
 
 
-class Modes(IntEnum):
-    DMDIR = 0x80000000
-    DMAPPEND = 0x40000000
-    DMEXCL = 0x20000000
+class Modes(IntFlag):
     DMMOUNT = 0x10000000
-    DMREAD = 0x4
-    DMWRITE = 0x2
+    DMEXCL = 0x20000000
+    DMAPPEND = 0x40000000
+    DMDIR = 0x80000000
+
     DMEXEC = 0x1
-    OEXEC = 0x3
-    ORDWR = 0x2
-    OWRITE = 0x1
-    OREAD = 0x0
+    DMWRITE = 0x2
+    DMREAD = 0x4
+
+    OREAD = 0
+    OWRITE = 1
+    ORDWR = 2
+    OEXEC = 3
+    OTRUNC = 16
+    OCEXEC = 32
+    ORCLOSE = 64

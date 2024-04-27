@@ -260,7 +260,16 @@ class FileServer(Py9Server):
         data: dict = d['data']
 
         fid = data['fid']
-        mode = Modes(data['mode'])
+        try:
+            mode = Modes(data['mode'])
+        except ValueError:
+            client.socket.sendall(
+                client._encode_Rerror(
+                    Errors.Enowrite,
+                    data['tag'],
+                )
+            )
+            return
 
         if data['fid'] not in client.fids:
             client.socket.sendall(
@@ -393,4 +402,5 @@ if __name__ == '__main__':
             print(fs.serve())
         except Exception:
             del fs
+            raise
             break
