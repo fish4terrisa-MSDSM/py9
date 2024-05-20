@@ -399,6 +399,9 @@ class FileServer(Py9Server):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) != 4:
+        print('usage: fileserver IP PORT DIR')
+        exit(-1)
     fs = FileServer(
         ip=sys.argv[1],
         port=int(sys.argv[2]),
@@ -407,7 +410,6 @@ if __name__ == '__main__':
     while True:
         try:
             print(fs.serve())
-        except Exception:
+        except KeyboardInterrupt:
             del fs
-            raise
             break

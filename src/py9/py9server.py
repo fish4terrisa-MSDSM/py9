@@ -62,6 +62,12 @@ class Py9Server(Py9):
                 'tag': tag,
             } | other_data
 
+        def __del__(self):
+            print("Shutting down client", self.client_id)
+            self.socket.shutdown(socket.SHUT_RDWR)
+            self.socket.recv(0)
+            self.socket.close()
+
     def __init__(
             self,
             ip: str,
@@ -72,6 +78,7 @@ class Py9Server(Py9):
         super().__init__(ip, port, msize, version)
         self.clients: dict[int, Py9Server.Client] = {}
         self.client_id: int = 0
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind((ip, port))
         self.socket.listen(10)
 
@@ -188,6 +195,7 @@ class Py9Server(Py9):
         raise NotImplementedError
 
     def __del__(self):
+        print("Shutting down server")
         clients = list(self.clients.keys())
         for id in clients:
             self.selector.unregister(self.clients[id].socket)
