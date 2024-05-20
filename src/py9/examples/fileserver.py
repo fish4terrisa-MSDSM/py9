@@ -219,13 +219,20 @@ class FileServer(Py9Server):
             return
 
         for p in map(lambda x: x.decode(), data['wnames']):
-            if not os.path.isdir(new_path):
+            if not os.path.isdir(self.directory + '/' + new_path):
                 failed = True
                 break
             walk_nodir = False
+            if '/' in p:
+                client.socket.sendall(
+                    client._encode_Rerror(
+                        Errors.Ebotch,
+                        data['tag'],
+                    )
+                )
             if p == '..':
                 if new_path != '/':
-                    new_path = new_path.split('/')[0:-1].join('/')
+                    new_path = '/'.join(new_path.split('/')[0:-1])
             else:
                 if os.path.exists(self.directory + '/' + new_path + '/' + p):
                     new_path = new_path + '/' + p
