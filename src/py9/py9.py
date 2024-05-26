@@ -4,6 +4,7 @@ import selectors
 import socket
 import struct
 
+from .errors import Errors
 from .trs import TRs
 from .qid import Qid
 from .stat9 import Stat
@@ -77,11 +78,22 @@ class Py9:
             self,
             sock: socket.socket,
     ) -> dict:
-        size: int = struct.unpack('<I', self._recv_n(sock, 4))[0]
-        buf: bytes = self._recv_n(sock, size - 4)
-        operation: TRs = TRs(struct.unpack('<B', buf[0:1])[0])
-        tag: int = struct.unpack('<H', buf[1:3])[0]
-        other_data: dict = self._parse_data(operation, buf[3:])
+        tag = None
+        try:
+            size: int = struct.unpack('<I', self._recv_n(sock, 4))[0]
+            buf: bytes = self._recv_n(sock, size - 4)
+            operation: TRs = TRs(struct.unpack('<B', buf[0:1])[0])
+            tag: int = struct.unpack('<H', buf[1:3])[0]
+            other_data: dict = self._parse_data(operation, buf[3:])
+        except Exception:
+            if tag:
+                sock.sendall(
+                    self._encode_Rerror(
+                        Errors.Ebotch,
+                        tag,
+                    )
+                )
+            return None
 
         return {
             'operation': operation,
