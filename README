@@ -1,0 +1,5 @@
+Py9 Library
+
+Simple library providing client and server utilities for 9P2000
+protocol. Check `src/py9/exmaples/fileserver.py` for server example or
+run it with `python3 -m py9.examples.fileserver 0.0.0.0 5555 ./`.
