@@ -701,7 +701,7 @@ class Py9:
         buff += struct.pack('<I', fid)
         buff += stat.to_bytes()
 
-        return self._encode_packet(TRs.Tremove, buff)
+        return self._encode_packet(TRs.Twstat, buff)
 
     def _encode_Rwstat(
             self,
@@ -709,7 +709,7 @@ class Py9:
     ) -> bytes:
         buff: bytes = b''
 
-        return self._encode_packet(TRs.Rremove, buff, tag)
+        return self._encode_packet(TRs.Rwstat, buff, tag)
 
     @abstractmethod
     def __del__(self):
